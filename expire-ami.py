@@ -2,15 +2,12 @@ import json
 import boto3
 import re
 
-AMI_PATTERN = re.compile("jenkins-win-slave*")  # The pattern to match AMIs to
-NUMBER_TO_RETAIN = 2  # Number of non-tagged AMIs to retain
-ACCOUNT_IDS = ['524624737625']  # List of accounts to check for AMIs
-
+AMI_PATTERN = re.compile("myaminame" + "*") # The pattern to match AMIs to
+NUMBER_TO_RETAIN = 2 # Number of non-tagged AMIs to retain
 
 class Image:
     """ Helper class for AMI images
     """
-
     def __init__(self, name, created, tags, id, snapshots):
         self.name = name
         self.created = created
@@ -18,13 +15,11 @@ class Image:
         self.id = id
         self.snapshots = snapshots
         self.delete = True
-
+    
     def __str__(self):
         return 'Image: ' + self.name + self.created + str(self.delete)
-
     def __repr__(self):
         return 'Image: ' + self.name + self.created + str(self.delete)
-
 
 def get_slave_images(response):
     """ Return a list of lists of the required attributes of all images from
@@ -39,14 +34,13 @@ def get_slave_images(response):
             for bdm in image["BlockDeviceMappings"]:
                 if "Ebs" in bdm:
                     snapshots.append(bdm["Ebs"]["SnapshotId"])
-            slaveAmis.append(Image(image["Name"],
-                                   image["CreationDate"],
-                                   image["Tags"],
-                                   image["ImageId"],
-                                   snapshots))
+            slaveAmis.append(Image(image["Name"], 
+                                    image["CreationDate"], 
+                                    image["Tags"], 
+                                    image["ImageId"], 
+                                    snapshots))
     return slaveAmis
-
-
+    
 def remove_tagged_images(imageList):
     """ Remove from a given list of Image objects any images with the tag
         'Retain' present
@@ -61,18 +55,16 @@ def remove_tagged_images(imageList):
             untaggedList.append(image)
     return untaggedList
 
-
 def mark_newest_images(imageList, numberToRetain):
     """ Given a list of images, Set the delete attribute of the image to
         False if it is one of the numberToRetain-th newest
     """
-    sortedList = sorted(imageList,
-                        reverse=True,
+    sortedList = sorted(imageList, 
+                        reverse=True, 
                         key=lambda image: image.created)
     for x in range(0, numberToRetain):
         sortedList[x].delete = False
     return sortedList
-
 
 def delete_old_images(imageList):
     """ Delete any AMIs marked for deletion, along with their associated
@@ -95,15 +87,14 @@ def delete_old_images(imageList):
             SnapshotId=snapshot
         )
 
-
 def lambda_handler(event, context):
     ec2 = boto3.client('ec2')
-
+    
     for account_id in ACCOUNT_IDS:
         response = ec2.describe_images(
-            Owners=[account_id]
+        Owners=[account_id]
         )["Images"]
-
+        
         slaveImages = get_slave_images(response)
         slaveImages = remove_tagged_images(slaveImages)
         slaveImages = mark_newest_images(slaveImages, NUMBER_TO_RETAIN)
@@ -112,3 +103,5 @@ def lambda_handler(event, context):
         'statusCode': 200,
         'body': ""
     }
+
+
